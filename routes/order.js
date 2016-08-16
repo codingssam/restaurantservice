@@ -123,7 +123,6 @@ router.put('/:oid', function(req, res, next) {
     res.send({
       message: req.params.oid + ', update order',
       result: {
-        order_id: req.params.oid,
         changedRows: result
       }
     });
