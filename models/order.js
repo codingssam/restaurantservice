@@ -1,12 +1,6 @@
 var mysql = require('mysql');
 var async = require('async');
-
-var dbConfig = {
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
-};
+var dbConfig = require('../config/dbConfig');
 
 function placeOrder(orderObj, callback) {
   var sql_insert_menu_order = 'INSERT INTO menu_order(branch_id, customer_id) ' +
