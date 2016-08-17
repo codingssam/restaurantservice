@@ -38,7 +38,24 @@ passport.deserializeUser(function(id, done) {
   });
 });
 
-router.post('/local/login', passport.authenticate('local'), function(req, res, next) {
+router.post('/local/login', function(req, res, next) {
+  passport.authenticate('local', function(err, user) {
+    if (err) {
+      return next(err);
+    }
+    if (!user) {
+      return res.status(401).send({
+        message: 'Login failed!!!'
+      });
+    }
+    req.login(user, function(err) {
+      if (err) {
+        return next(err);
+      }
+      next();
+    });
+  })(req, res, next);
+}, function(req, res, next) {
   var user = {};
   user.email = req.user.email;
   user.name = req.user.name;
