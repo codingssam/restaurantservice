@@ -39,7 +39,7 @@ function verifyPassword(password, hashPassword, callback) {
 }
 
 function findCustomer(customerId, callback) {
-  var sql = 'SELECT id, name, email FROM customer WHERE id = ?';
+  var sql = 'SELECT id, name, email, facebookid FROM customer WHERE id = ?';
   var dbConn = mysql.createConnection(dbConfig);
 
   dbConn.query(sql, [customerId], function(err, results) {
@@ -48,7 +48,45 @@ function findCustomer(customerId, callback) {
       return callback(err);
     }
     dbConn.end();
-    callback(null, results[0]);
+    var user = {};
+    user.id = results[0].id;
+    user.name = results[0].name;
+    user.email = results[0].email;
+    user.facebookid = results[0].facebookid;
+    callback(null, user);
+  });
+}
+
+function findOrCreate(profile, callback) {
+  var sql_facebookid = "select id, name, email, facebookid " +
+                       "from customer " +
+                       "where facebookid = ?";
+  var sql_insert_facebookid = "insert into customer(name, email, facebookid) " +
+                              "value (?, ?, ?)";
+
+  var dbConn = mysql.createConnection(dbConfig);
+  dbConn.query(sql_facebookid, [profile.id], function(err, results) {
+    if (err) {
+      dbConn.end();
+      return callback(err);
+    }
+    if (results.length !== 0) {
+      dbConn.end();
+      return callback(null, results);
+    }
+    dbConn.query(sql_insert_facebookid, [profile.displayName, profile.email, profile.id], function(err, result) {
+      if (err) {
+        dbConn.end();
+        return callback(err);
+      }
+      dbConn.end();
+      var user = {};
+      user.id = result.insertId;
+      user.name = profile.displayName;
+      user.email = profile.email;
+      user.facebookid = profile.id;
+      return callback(null, user);
+    });
   });
 }
 
@@ -70,3 +108,4 @@ module.exports.updateCustomer = updateCustomer;
 module.exports.listCustomers = listCustomers;
 module.exports.findByEmail = findByEmail;
 module.exports.verifyPassword = verifyPassword;
+module.exports.findOrCreate = findOrCreate;

@@ -2,6 +2,7 @@ var express = require('express');
 var router = express.Router();
 var passport = require('passport');
 var LocalStrategy = require('passport-local').Strategy;
+var FacebookStrategy = require('passport-facebook').Strategy;
 var Customer = require('../models/customer');
 
 passport.use(new LocalStrategy({usernameField: 'email', passwordField: 'password'}, function(email, password, done) {
@@ -38,6 +39,21 @@ passport.deserializeUser(function(id, done) {
   });
 });
 
+passport.use(new FacebookStrategy({
+  clientID: process.env.FACEBOOK_APP_ID,
+  clientSecret: process.env.FACEBOOK_APP_SECRET,
+  callbackURL: process.env.FACEBOOK_CALLBACK_URL,
+  profileFields: ['id', 'displayName', 'email']
+},
+function(accessToken, refreshToken, profile, done) {
+  Customer.findOrCreate(profile, function (err, user) {
+    if (err) {
+      return done(err);
+    }
+    return done(null, user);
+  });
+}));
+
 router.post('/local/login', function(req, res, next) {
   passport.authenticate('local', function(err, user) {
     if (err) {
@@ -70,11 +86,9 @@ router.get('/local/logout', function(req, res, next) {
   res.send({ message: 'local logout' });
 });
 
-router.get('/facebook', function(req, res, next) {
-  res.send({ message: 'facebook' });
-});
+router.get('/facebook', passport.authenticate('facebook'));
 
-router.get('/facebook/callback', function(req, res, next) {
+router.get('/facebook/callback', passport.authenticate('facebook'), function(req, res, next) {
   res.send({ message: 'facebook callback' });
 });
 
