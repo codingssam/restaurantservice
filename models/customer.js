@@ -72,7 +72,12 @@ function findOrCreate(profile, callback) {
     }
     if (results.length !== 0) {
       dbConn.end();
-      return callback(null, results);
+      var user = {};
+      user.id = results[0].id;
+      user.name = results[0].name;
+      user.email = results[0].email;
+      user.facebookid = results[0].facebookid;
+      return callback(null, user);
     }
     dbConn.query(sql_insert_facebookid, [profile.displayName, profile.email, profile.id], function(err, result) {
       if (err) {
