@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var Order = require('../models/order');
+var isAutenticated = require('./common').isAuthenticated;
 
 // 주문 목록 조회, GET /orders
 router.get('/', function(req, res, next) {
@@ -58,7 +59,7 @@ router.get('/', function(req, res, next) {
 });
 
 // 주문 생성, POST /orders
-router.post('/', function(req, res, next) {
+router.post('/', isAutenticated, function(req, res, next) {
   var newOrder = {};
   newOrder.branch_id = req.body.branch_id;
   newOrder.customer_id = req.body.customer_id;
@@ -106,7 +107,7 @@ router.get('/:oid', function(req, res, next) {
 });
 
 // 주문 변경, PUT /orders/:oid
-router.put('/:oid', function(req, res, next) {
+router.put('/:oid', isAutenticated, function(req, res, next) {
   var oid = req.params.oid;
   var details = [];
   for (var i = 0; i < req.body.branch_menu_ids.length; i++) {

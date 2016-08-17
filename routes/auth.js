@@ -19,15 +19,32 @@ passport.use(new LocalStrategy({usernameField: 'email', passwordField: 'password
       if (!result) {
         return done(null, false);
       }
+      delete user.password;
       done(null, user);
     })
   });
 }));
 
+passport.serializeUser(function(user, done) {
+  done(null, user.id);
+});
+
+passport.deserializeUser(function(id, done) {
+  Customer.findCustomer(id, function(err, user) {
+    if (err) {
+      return done(err);
+    }
+    done(null, user);
+  });
+});
+
 router.post('/local/login', passport.authenticate('local'), function(req, res, next) {
+  var user = {};
+  user.email = req.user.email;
+  user.name = req.user.name;
   res.send({
     message: 'local login',
-    user: req.user
+    user: user
   });
 });
 

@@ -39,7 +39,17 @@ function verifyPassword(password, hashPassword, callback) {
 }
 
 function findCustomer(customerId, callback) {
+  var sql = 'SELECT id, name, email FROM customer WHERE id = ?';
+  var dbConn = mysql.createConnection(dbConfig);
 
+  dbConn.query(sql, [customerId], function(err, results) {
+    if (err) {
+      dbConn.end();
+      return callback(err);
+    }
+    dbConn.end();
+    callback(null, results[0]);
+  });
 }
 
 function registerCustomer(newCustomer, callback) {
