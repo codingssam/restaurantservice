@@ -70,6 +70,7 @@ function findOrCreate(profile, callback) {
       dbConn.end();
       return callback(err);
     }
+
     if (results.length !== 0) {
       dbConn.end();
       var user = {};
@@ -79,7 +80,7 @@ function findOrCreate(profile, callback) {
       user.facebookid = results[0].facebookid;
       return callback(null, user);
     }
-    dbConn.query(sql_insert_facebookid, [profile.displayName, profile.email, profile.id], function(err, result) {
+    dbConn.query(sql_insert_facebookid, [profile.displayName, profile.emails[0].value, profile.id], function(err, result) {
       if (err) {
         dbConn.end();
         return callback(err);
@@ -88,7 +89,7 @@ function findOrCreate(profile, callback) {
       var user = {};
       user.id = result.insertId;
       user.name = profile.displayName;
-      user.email = profile.email;
+      user.email = profile.emails[0].value;
       user.facebookid = profile.id;
       return callback(null, user);
     });
