@@ -3,6 +3,7 @@ var router = express.Router();
 var passport = require('passport');
 var LocalStrategy = require('passport-local').Strategy;
 var FacebookStrategy = require('passport-facebook').Strategy;
+var FacebookTokenStrategy = require('passport-facebook-token');
 var Customer = require('../models/customer');
 
 passport.use(new LocalStrategy({usernameField: 'email', passwordField: 'password'}, function(email, password, done) {
@@ -46,6 +47,19 @@ passport.use(new FacebookStrategy({
   profileFields: ['id', 'displayName', 'name', 'gender', 'profileUrl', 'photos', 'emails']
 },
 function(accessToken, refreshToken, profile, done) {
+  console.log(accessToken);
+  Customer.findOrCreate(profile, function (err, user) {
+    if (err) {
+      return done(err);
+    }
+    return done(null, user);
+  });
+}));
+
+passport.use(new FacebookTokenStrategy({
+  clientID: process.env.FACEBOOK_APP_ID,
+  clientSecret: process.env.FACEBOOK_APP_SECRET
+}, function(accessToken, refreshToken, profile, done) {
   Customer.findOrCreate(profile, function (err, user) {
     if (err) {
       return done(err);
@@ -92,8 +106,8 @@ router.get('/facebook/callback', passport.authenticate('facebook'), function(req
   res.send({ message: 'facebook callback' });
 });
 
-router.post('/facebook/token', function(req, res, next) {
-  res.send({ message: 'facebook token' });
+router.post('/facebook/token', passport.authenticate('facebook-token', {scope : ['email']}), function(req, res, next) {
+  res.send(req.user? '성공' : '실패');
 });
 
 module.exports = router;
