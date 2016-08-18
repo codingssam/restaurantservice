@@ -27,7 +27,7 @@ router.post('/', function(req, res, next) {
     menu.name = fields.menu_name;
     menu.price = parseInt(fields.price, 10);
     menu.files = [];
-    
+
     // files.photos가 Array일 경우
     if (files.photos instanceof Array) {
       async.each(files.photos, function(item, done) {
@@ -46,9 +46,36 @@ router.post('/', function(req, res, next) {
           }
           menu.id = result;
           res.send({
-            message: 'create menu',
+            message: 'create menu with files',
             menu: menu
           });
+        });
+      });
+    } else if (!files.photos) {
+      Menu.createMenu(menu, function(err, result) {
+        if (err) {
+          return next(err);
+        }
+        menu.id = result;
+
+        res.send({
+          message: 'create menu without a file',
+          menu: menu
+        });
+      });
+    } else {
+      menu.files.push({
+        path: files.photos.path,
+        name: files.photos.name
+      });
+      Menu.createMenu(menu, function(err, result) {
+        if (err) {
+          return next(err);
+        }
+        menu.id = result;
+        res.send({
+          message: 'create menu with a file',
+          menu: menu
         });
       });
     }
