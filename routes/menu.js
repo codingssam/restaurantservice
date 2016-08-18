@@ -10,7 +10,16 @@ router.get('/', function(req, res, next) {
 });
 
 router.get('/:id', function(req, res, next) {
-  res.send({ message: 'show menu(' + req.params.id + ')'});
+  var menuId = req.params.id;
+  Menu.findMenu(menuId, function(err, menu) {
+    if (err) {
+      return next(err);
+    }
+    res.send({
+      message: 'show menu(' + req.params.id + ')',
+      menu: menu
+    });
+  })
 });
 
 router.post('/', function(req, res, next) {

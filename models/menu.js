@@ -1,6 +1,55 @@
 var mysql = require('mysql');
 var async = require('async');
 var dbConfig = require('../config/dbConfig');
+var dbPoolConfig = require('../config/dbPoolConfig');
+var path = require('path');
+var url = require('url');
+
+function findMenu(menuId, callback) {
+  var sql_select_menu = 'SELECT id, name, price FROM menu WHERE id = ?';
+  var sql_select_file = 'SELECT filename, filepath FROM file WHERE menu_id = ?';
+
+  var dbPool = mysql.createPool(dbPoolConfig);
+  dbPool.getConnection(function(err, conn) {
+    if (err) {
+      return callback(err);
+    }
+    var menu = {};
+    async.parallel([selectMenu, selectFile], function(err, results) {
+      if (err) {
+        conn.release();
+        return callback(err);
+      }
+      menu.id = results[0][0].id;
+      menu.name = results[0][0].name;
+      menu.price = results[0][0].price;
+      menu.originalFilename = results[1][0].filename;
+      var filename = path.basename(results[1][1].filepath);
+      menu.fileUrl = url.resolve('http://localhost:3000', '/images/' + filename);
+      conn.release();
+      callback(null, menu);
+    });
+
+    function selectMenu(callback) {
+      conn.query(sql_select_menu, [menuId], function(err, results) {
+        if (err) {
+          return callback(err);
+        }
+        callback(null, results);
+      });
+    }
+
+    function selectFile(callback) {
+      conn.query(sql_select_file, [menuId], function(err, results) {
+        if (err) {
+          return callback(err);
+        }
+        callback(null, results);
+      });
+    }
+  });
+
+}
 
 function createMenu(menu, callback) {
   var sql_insert_menu = 'INSERT INTO menu(name, price) ' +
@@ -58,3 +107,4 @@ function createMenu(menu, callback) {
 }
 
 module.exports.createMenu = createMenu;
+module.exports.findMenu = findMenu;
