@@ -8,14 +8,13 @@ function createMenu(menu, callback) {
   var sql_insert_file = 'INSERT INTO file(menu_id, filename, filepath) ' +
                         'VALUES (?, ?, ?)';
 
+  var menu_id;
   var dbConn = mysql.createConnection(dbConfig);
 
   dbConn.beginTransaction(function (err) {
     if (err) {
       return callback(err);
     }
-
-    var menu_id;
 
     async.series([insertMenu, insertFile], function (err) {
       if (err) {
@@ -42,21 +41,19 @@ function createMenu(menu, callback) {
   }
 
   function insertFile(callback) {
-    if (menu.files.length > 1) {
-      async.each(menu.files, function(item, done) {
-        dbConn.query(sql_insert_file, [menu_id, item.name, item.path], function(err, result) {
-          if (err) {
-            return done(err);
-          }
-          done(null);
-        });
-      }, function(err) {
+    async.each(menu.files, function(item, done) {
+      dbConn.query(sql_insert_file, [menu_id, item.name, item.path], function(err, result) {
         if (err) {
-          return callback(err);
+          return done(err);
         }
-        callback(null);
+        done(null);
       });
-    }
+    }, function(err) {
+      if (err) {
+        return callback(err);
+      }
+      callback(null);
+    });
   }
 }
 

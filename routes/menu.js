@@ -27,6 +27,7 @@ router.post('/', function(req, res, next) {
     menu.name = fields.menu_name;
     menu.price = parseInt(fields.price, 10);
     menu.files = [];
+    
     // files.photos가 Array일 경우
     if (files.photos instanceof Array) {
       async.each(files.photos, function(item, done) {
