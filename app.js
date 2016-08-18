@@ -39,7 +39,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/auth', auth);
 app.use('/orders', order);
 app.use('/customers', customer);
-// app.use('/menus', menu);
+app.use('/menus', menu);
 // app.use('/branches', branch);
 
 // catch 404 and forward to error handler
