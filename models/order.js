@@ -1,6 +1,6 @@
 var mysql = require('mysql');
 var async = require('async');
-var dbConfig = require('../config/dbConfig');
+var dbPool = require('../models/common').dbPool;
 
 function placeOrder(orderObj, callback) {
   var sql_insert_menu_order = 'INSERT INTO menu_order(branch_id, customer_id) ' +
@@ -14,87 +14,93 @@ function placeOrder(orderObj, callback) {
     'FROM menu_order mo ' +
     'WHERE mo.id = ? ';
 
-  var dbConn = mysql.createConnection(dbConfig);
-  dbConn.beginTransaction(function (err) {
+  dbPool.getConnection(function (err, dbConn) {
     if (err) {
       return callback(err);
-    }
-    async.series([insertMenuOrder, insertMenuOrderDetailsEach], function (err) {
-      if (err) {
-        return dbConn.rollback(function () {
-          callback(err);
-          dbConn.end();
+    } else {
+      dbConn.beginTransaction(function (err) {
+        if (err) {
+          dbConn.release();
+          return callback(err);
+        }
+        async.series([insertMenuOrder, insertMenuOrderDetailsEach], function (err) {
+          if (err) {
+            return dbConn.rollback(function () {
+              dbConn.release();
+              callback(err);
+            });
+          }
+          dbConn.commit(function () {
+            dbConn.release();
+            callback(null, orderObj);
+          })
         });
-      }
-      dbConn.commit(function () {
-        callback(null, orderObj);
-        dbConn.end();
-      })
-    });
-  });
+      });
+    }
 
-  function insertMenuOrder(callback) {
-    dbConn.query(sql_insert_menu_order, [orderObj.branch_id, orderObj.customer_id], function (err, result) {
-      if (err) {
-        return callback(err);
-      }
-      console.log('result.insertId: ' + result.insertId);
-      orderObj.id = result.insertId;
-      selectMenuOrderDtime(orderObj.id, function (err, result) {
+    function insertMenuOrder(callback) {
+      dbConn.query(sql_insert_menu_order, [orderObj.branch_id, orderObj.customer_id], function (err, result) {
         if (err) {
           return callback(err);
         }
-        orderObj.order_dtime = result;
-        callback(null);
-      });
-    });
-  }
-
-  function insertMenuOrderDetailsEach(callback) {
-    async.each(orderObj.details, function (item, done) {
-      insertMenuOrderDetails(orderObj.id, item, done);
-    }, function (err) {
-      if (err) {
-        return callback(err);
-      }
-      callback(null);
-    });
-  }
-
-  function insertMenuOrderDetails(id, item, callback) {
-    selectMenuPrice(item.branch_menu_id, function (err, price) {
-      if (err) {
-        return callback(err);
-      }
-      item.menu_price = price;
-      dbConn.query(sql_insert_menu_order_details,
-        [id, item.branch_menu_id, item.quantity, item.menu_price], function (err, result) {
+        console.log('result.insertId: ' + result.insertId);
+        orderObj.id = result.insertId;
+        selectMenuOrderDtime(orderObj.id, function (err, result) {
           if (err) {
             return callback(err);
           }
+          orderObj.order_dtime = result;
           callback(null);
         });
-    });
-  }
+      });
+    }
 
-  function selectMenuPrice(branch_menu_id, callback) {
-    dbConn.query(sql_select_menu_price, [branch_menu_id], function (err, results) {
-      if (err) {
-        return callback(err);
-      }
-      callback(null, results[0].price);
-    });
-  }
+    function insertMenuOrderDetailsEach(callback) {
+      async.each(orderObj.details, function (item, done) {
+        insertMenuOrderDetails(orderObj.id, item, done);
+      }, function (err) {
+        if (err) {
+          return callback(err);
+        }
+        callback(null);
+      });
+    }
 
-  function selectMenuOrderDtime(menu_order_id, callback) {
-    dbConn.query(sql_select_menu_order_dtime, [menu_order_id], function (err, results) {
-      if (err) {
-        return callback(err);
-      }
-      callback(null, results[0].odtime);
-    });
-  }
+    function insertMenuOrderDetails(id, item, callback) {
+      selectMenuPrice(item.branch_menu_id, function (err, price) {
+        if (err) {
+          return callback(err);
+        }
+        item.menu_price = price;
+        dbConn.query(sql_insert_menu_order_details,
+          [id, item.branch_menu_id, item.quantity, item.menu_price], function (err, result) {
+            if (err) {
+              return callback(err);
+            }
+            callback(null);
+          });
+      });
+    }
 
+    function selectMenuOrderDtime(menu_order_id, callback) {
+      dbConn.query(sql_select_menu_order_dtime, [menu_order_id], function (err, results) {
+        if (err) {
+          return callback(err);
+        }
+        callback(null, results[0].odtime);
+      });
+    }
+
+    function selectMenuPrice(branch_menu_id, callback) {
+      dbConn.query(sql_select_menu_price, [branch_menu_id], function (err, results) {
+        if (err) {
+          return callback(err);
+        }
+        callback(null, results[0].price);
+      });
+    }
+
+  });
 }
 
 function listOrders(pageNo, rowCount, callback) {
@@ -110,14 +116,17 @@ function listOrders(pageNo, rowCount, callback) {
     'ORDER BY mo.id DESC ' +
     'LIMIT ?, ?';
 
-  var dbConn = mysql.createConnection(dbConfig);
-  dbConn.query(sql, ["+00:00", "+09:00", rowCount * (pageNo - 1), rowCount], function (err, results) {
+  dbPool.getConnection(function(err, dbConn) {
     if (err) {
-      dbConn.end();
       return callback(err);
     }
-    callback(null, results);
-    dbConn.end();
+    dbConn.query(sql, ["+00:00", "+09:00", rowCount * (pageNo - 1), rowCount], function (err, results) {
+      dbConn.release();
+      if (err) {
+        return callback(err);
+      }
+      callback(null, results);
+    });
   });
 }
 
@@ -127,14 +136,14 @@ function showOrderDetails(orderId, callback) {
     'JOIN menu m ON (bm.menu_id = m.id) ' +
     'WHERE menu_order_id = ?';
 
-  var dbConn = mysql.createConnection(dbConfig);
-  dbConn.query(sql_select_menu_order_details, [orderId], function (err, results) {
-    if (err) {
-      dbConn.end();
-      return callback(err);
-    }
-    callback(null, results);
-    dbConn.end();
+  dbPool.getConnection(function (err, dbConn) {
+    dbConn.query(sql_select_menu_order_details, [orderId], function (err, results) {
+      dbConn.release();
+      if (err) {
+        return callback(err);
+      }
+      callback(null, results);
+    });
   });
 }
 
@@ -143,37 +152,40 @@ function updateOrderDetails(orderId, details, callback) {
   var sql_update_menu_order_details = "update menu_order_details " +
                                       "set  quantity = ? " +
                                       "where menu_order_id = ? and branch_menu_id = ?";
-  var dbConn = mysql.createConnection(dbConfig);
-  var changedRows = 0;
-
-  dbConn.beginTransaction(function(err) {
+  dbPool.getConnection(function (err, dbConn) {
     if (err) {
       return callback(err);
     }
-    async.each(details, function(item, done) {
-      dbConn.query(sql_update_menu_order_details,
-        [item.quantity, orderId, item.branch_menu_id], function(err, result) {
-        if (err) {
-          return done(err);
-        }
-        changedRows += result.changedRows;
-        done(null);
-      });
-    }, function(err) {
+    var changedRows = 0;
+
+    dbConn.beginTransaction(function(err) {
       if (err) {
-        return dbConn.rollback(function() {
-          callback(err);
-          dbConn.end();
-        });
+        dbConn.release();
+        return callback(err);
       }
-      dbConn.commit(function() {
-        callback(null, changedRows);
-        dbConn.end();
-      });
-    })
-
+      async.each(details, function(item, done) {
+        dbConn.query(sql_update_menu_order_details,
+          [item.quantity, orderId, item.branch_menu_id], function(err, result) {
+            if (err) {
+              return done(err);
+            }
+            changedRows += result.changedRows;
+            done(null);
+          });
+      }, function(err) {
+        if (err) {
+          return dbConn.rollback(function() {
+            dbConn.release();
+            callback(err);
+          });
+        }
+        dbConn.commit(function() {
+          dbConn.release();
+          callback(null, changedRows);
+        });
+      })
+    });
   });
-
 }
 
 module.exports.placeOrder = placeOrder;

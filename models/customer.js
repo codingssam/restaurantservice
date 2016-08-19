@@ -1,59 +1,63 @@
 var mysql = require('mysql');
 var async = require('async');
-var dbConfig = require('../config/dbConfig');
+var dbPool = require('../models/common').dbPool;
 
 function findByEmail(email, callback) {
   var sql = 'SELECT id, name, email, password FROM customer WHERE email = ?';
-  var dbConn = mysql.createConnection(dbConfig);
-
-  dbConn.query(sql, [email], function(err, results) {
+  dbPool.getConnection(function(err, dbConn) {
     if (err) {
-      dbConn.end();
       return callback(err);
     }
-    if (results.length === 0) {
-      return callback(null, null);
-    }
-    dbConn.end();
-    callback(null, results[0]);
-  })
+    dbConn.query(sql, [email], function(err, results) {
+      dbConn.release();
+      if (err) {
+        return callback(err);
+      }
+      if (results.length === 0) {
+        return callback(null, null);
+      }
+      callback(null, results[0]);
+    })
+  });
 }
 
 function verifyPassword(password, hashPassword, callback) {
   var sql = 'SELECT SHA2(?, 512) password';
-  var dbConn = mysql.createConnection(dbConfig);
-
-  dbConn.query(sql, [password], function(err, results) {
+  dbPool.getConnection(function(err, dbConn){
     if (err) {
-      dbConn.end();
       return callback(err);
     }
-
-    if (results[0].password !== hashPassword) {
-      dbConn.end();
-      return callback(null, false)
-    }
-    dbConn.end();
-    callback(null, true);
+    dbConn.query(sql, [password], function(err, results) {
+      dbConn.release();
+      if (err) {
+        return callback(err);
+      }
+      if (results[0].password !== hashPassword) {
+        return callback(null, false)
+      }
+      callback(null, true);
+    });
   });
 }
 
 function findCustomer(customerId, callback) {
   var sql = 'SELECT id, name, email, facebookid FROM customer WHERE id = ?';
-  var dbConn = mysql.createConnection(dbConfig);
-
-  dbConn.query(sql, [customerId], function(err, results) {
+  dbPool.getConnection(function(err, dbConn) {
     if (err) {
-      dbConn.end();
       return callback(err);
     }
-    dbConn.end();
-    var user = {};
-    user.id = results[0].id;
-    user.name = results[0].name;
-    user.email = results[0].email;
-    user.facebookid = results[0].facebookid;
-    callback(null, user);
+    dbConn.query(sql, [customerId], function(err, results) {
+      dbConn.release();
+      if (err) {
+        return callback(err);
+      }
+      var user = {};
+      user.id = results[0].id;
+      user.name = results[0].name;
+      user.email = results[0].email;
+      user.facebookid = results[0].facebookid;
+      callback(null, user);
+    });
   });
 }
 
@@ -64,34 +68,36 @@ function findOrCreate(profile, callback) {
   var sql_insert_facebookid = "insert into customer(name, email, facebookid) " +
                               "value (?, ?, ?)";
 
-  var dbConn = mysql.createConnection(dbConfig);
-  dbConn.query(sql_facebookid, [profile.id], function(err, results) {
+  dbPool.getConnection(function(err, dbConn) {
     if (err) {
-      dbConn.end();
       return callback(err);
     }
-
-    if (results.length !== 0) {
-      dbConn.end();
-      var user = {};
-      user.id = results[0].id;
-      user.name = results[0].name;
-      user.email = results[0].email;
-      user.facebookid = results[0].facebookid;
-      return callback(null, user);
-    }
-    dbConn.query(sql_insert_facebookid, [profile.displayName, profile.emails[0].value, profile.id], function(err, result) {
+    dbConn.query(sql_facebookid, [profile.id], function(err, results) {
       if (err) {
-        dbConn.end();
+        dbConn.release();
         return callback(err);
       }
-      dbConn.end();
-      var user = {};
-      user.id = result.insertId;
-      user.name = profile.displayName;
-      user.email = profile.emails[0].value;
-      user.facebookid = profile.id;
-      return callback(null, user);
+      if (results.length !== 0) {
+        dbConn.release();
+        var user = {};
+        user.id = results[0].id;
+        user.name = results[0].name;
+        user.email = results[0].email;
+        user.facebookid = results[0].facebookid;
+        return callback(null, user);
+      }
+      dbConn.query(sql_insert_facebookid, [profile.displayName, profile.emails[0].value, profile.id], function(err, result) {
+        dbConn.release();
+        if (err) {
+          return callback(err);
+        }
+        var user = {};
+        user.id = result.insertId;
+        user.name = profile.displayName;
+        user.email = profile.emails[0].value;
+        user.facebookid = profile.id;
+        return callback(null, user);
+      });
     });
   });
 }
